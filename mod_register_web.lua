@@ -113,6 +113,7 @@ end
 
 function register_user(form, origin)
 	local prepped_username = nodeprep(form.username);
+	local register_hosts = module:get_option("registration_hosts");
 	if not prepped_username then
 		return nil, "Username contains forbidden characters";
 	end
@@ -127,24 +128,27 @@ function register_user(form, origin)
 	if not registering.allowed then
 		return nil, "Registration not allowed";
 	end
-	local ok, err = usermanager.create_user(prepped_username, form.password, module.host);
-	if ok then
-		local extra_data = {};
-		for field in pairs(extra_fields) do
-			local field_value = form[field];
-			if field_value and #field_value > 0 then
-				extra_data[field] = field_value;
+	local ok, err;
+	for i, reg_host in ipairs(register_hosts) do
+		local ok, err = usermanager.create_user(prepped_username, form.password, reg_host);
+		if ok then
+			local extra_data = {};
+			for field in pairs(extra_fields) do
+				local field_value = form[field];
+				if field_value and #field_value > 0 then
+					extra_data[field] = field_value;
+				end
 			end
+			if next(extra_data) ~= nil then
+				datamanager.store(prepped_username, reg_host, "account_details", extra_data);
+			end
+			module:fire_event("user-registered", {
+				username = prepped_username,
+				host = reg_host,
+				source = module.name,
+				ip = origin.conn:ip(),
+			});
 		end
-		if next(extra_data) ~= nil then
-			datamanager.store(prepped_username, module.host, "account_details", extra_data);
-		end
-		module:fire_event("user-registered", {
-			username = prepped_username,
-			host = module.host,
-			source = module.name,
-			ip = origin.conn:ip(),
-		});
 	end
 	return ok, err;
 end

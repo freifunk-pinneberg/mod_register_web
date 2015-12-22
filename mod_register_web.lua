@@ -102,10 +102,20 @@ end
 
 function generate_page(event, display_options)
 	local request, response = event.request, event.response;
+	local register_hosts = module:get_option("registration_hosts");
+	local hosts = ""
+	for i, reg_host in ipairs(register_hosts) do
+		if(string.len(hosts) == 0) then
+			hosts = reg_host
+		else
+			hosts = hosts .. ", @" .. reg_host;
+		end
+	end
 
 	response.headers.content_type = "text/html; charset=utf-8";
 	return render(register_tpl, {
-		path = request.path; hostname = module.host;
+		path = request.path; 
+		hostname = hosts;
 		notice = display_options and display_options.register_error or "";
 		captcha = generate_captcha(display_options);
 	})

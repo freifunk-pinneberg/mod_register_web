@@ -100,9 +100,10 @@ else
 	end
 end
 
-function generate_page(event, display_options)
+function generate_page(event, display_options, form)
 	local request, response = event.request, event.response;
 	local register_hosts = module:get_option("registration_hosts");
+	local username;
 	local hosts = ""
 	for i, reg_host in ipairs(register_hosts) do
 		if(string.len(hosts) == 0) then
@@ -112,10 +113,17 @@ function generate_page(event, display_options)
 		end
 	end
 
+	if (form== nil) then
+		username = " ";
+	else
+		username = form.username;
+	end
+
 	response.headers.content_type = "text/html; charset=utf-8";
 	return render(register_tpl, {
 		path = request.path; 
 		hostname = hosts;
+		username = username;
 		notice = display_options and display_options.register_error or "";
 		captcha = generate_captcha(display_options);
 	})
@@ -175,7 +183,7 @@ function generate_register_response(event, form, ok, err)
 	if ok then
 		return generate_success(event, form);
 	else
-		return generate_page(event, { register_error = err });
+		return generate_page(event, { register_error = err },form);
 	end
 end
 

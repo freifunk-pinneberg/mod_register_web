@@ -124,19 +124,21 @@ end
 function register_user(form, origin)
 	local prepped_username = nodeprep(form.username);
 	local register_hosts = module:get_option("registration_hosts");
-	if not prepped_username then
-		return nil, "Username contains forbidden characters";
-	end
-	if #prepped_username == 0 then
-		return nil, "The username field was empty";
-	end
-	if usermanager.user_exists(prepped_username, module.host) then
-		return nil, "Username already taken";
-	end
-	local registering = { username = prepped_username , host = module.host, allowed = true }
-	module:fire_event("user-registering", registering);
-	if not registering.allowed then
-		return nil, "Registration not allowed";
+	for i, reg_host in ipairs(register_hosts) do
+		if not prepped_username then
+			return nil, "Username contains forbidden characters";
+		end
+		if #prepped_username == 0 then
+			return nil, "The username field was empty";
+		end
+		if usermanager.user_exists(prepped_username, reg_host) then
+			return nil, "Username already taken";
+		end
+		local registering = { username = prepped_username , host = reg_host, allowed = true }
+		module:fire_event("user-registering", registering);
+		if not registering.allowed then
+			return nil, "Registration not allowed";
+		end
 	end
 	local ok, err;
 	for i, reg_host in ipairs(register_hosts) do

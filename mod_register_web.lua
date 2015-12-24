@@ -3,6 +3,7 @@ local nodeprep = require "util.encodings".stringprep.nodeprep;
 local usermanager = require "core.usermanager";
 local http = require "net.http";
 local path_sep = package.config:sub(1,1);
+local register_hosts = module:get_option("registration_hosts");
 
 module:depends"http";
 
@@ -102,8 +103,7 @@ end
 
 function generate_page(event, display_options, form)
 	local request, response = event.request, event.response;
-	local register_hosts = module:get_option("registration_hosts");
-	local username;
+	local username_value ="";
 	local hosts = ""
 	for i, reg_host in ipairs(register_hosts) do
 		if(string.len(hosts) == 0) then
@@ -113,17 +113,15 @@ function generate_page(event, display_options, form)
 		end
 	end
 
-	if (form== nil) then
-		username = " ";
-	else
-		username = form.username;
+	if not (form == nil) then
+		username_value = "value=" .. form.username;
 	end
 
 	response.headers.content_type = "text/html; charset=utf-8";
 	return render(register_tpl, {
 		path = request.path; 
 		hostname = hosts;
-		username = username;
+		username = username_value;
 		notice = display_options and display_options.register_error or "";
 		captcha = generate_captcha(display_options);
 	})
@@ -131,7 +129,6 @@ end
 
 function register_user(form, origin)
 	local prepped_username = nodeprep(form.username);
-	local register_hosts = module:get_option("registration_hosts");
 	for i, reg_host in ipairs(register_hosts) do
 		if not prepped_username then
 			return nil, "Username contains forbidden characters";
@@ -150,7 +147,7 @@ function register_user(form, origin)
 	end
 	local ok, err;
 	for i, reg_host in ipairs(register_hosts) do
-		local ok, err = usermanager.create_user(prepped_username, form.password, reg_host);
+		ok, err = usermanager.create_user(prepped_username, form.password, reg_host);
 		if ok then
 			local extra_data = {};
 			for field in pairs(extra_fields) do
@@ -162,6 +159,7 @@ function register_user(form, origin)
 			if next(extra_data) ~= nil then
 				datamanager.store(prepped_username, reg_host, "account_details", extra_data);
 			end
+			module:log("info", "User account created: %s@%s", prepped_username, reg_host);
 			module:fire_event("user-registered", {
 				username = prepped_username,
 				host = reg_host,
@@ -174,7 +172,15 @@ function register_user(form, origin)
 end
 
 function generate_success(event, form)
-	return render(success_tpl, { jid = nodeprep(form.username).."@"..module.host });
+	local output = "";
+	for i, reg_host in ipairs(register_hosts) do
+		if(string.len(output) == 0) then
+			output = nodeprep(form.username).."@"..reg_host;
+		else
+			output = output .. "  or  " .. nodeprep(form.username).."@"..reg_host;
+		end
+	end
+	return render(success_tpl, { jid = output });
 end
 
 function generate_register_response(event, form, ok, err)
